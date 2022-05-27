@@ -21,7 +21,6 @@ class SimpleSelector(Selector):
         return Population(population.n_best_observations(self.population_size))
 
 
-# TODO: fix RouletteSelector
 class RouletteSelector(Selector):
 
     def __init__(self, population_size: int):
@@ -29,21 +28,20 @@ class RouletteSelector(Selector):
 
     def select(self, population: Population) -> Population:
 
-        observations = copy(population.observations)
+        total = sum([obs.evaluate() for obs in population.observations])
+
+        probabilities = [0]
+        for j in range(len(population.observations)):
+            probabilities.append((population.observations[j].evaluate() / total) + probabilities[-1])
+
         selected = list()
 
-        for i in range(self.population_size):
-            total = sum([obs.evaluate() for obs in observations])
-            probs = [obs.evaluate() / total for obs in observations]
+        while len(selected) < self.population_size:
 
             roulette_spin = np.random.uniform()
-            arrow = 0.0
-            i = 0
-            while arrow < roulette_spin:
-                arrow += probs[i]
-                i += 1
 
-            selected.append(observations[i - 1])
-            observations.pop(i - 1)  # slow
+            for j in range(len(population.observations)):
+                if probabilities[j] < roulette_spin < probabilities[j + 1]:
+                    selected.append(population.observations[j])
 
         return Population(selected)

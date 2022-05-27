@@ -5,7 +5,7 @@ import numpy as np
 # params
 from src.domain.algorithm import GeneticAlgorithm
 from src.domain.population import Observation, Population
-from src.domain.selector import SimpleSelector
+from src.domain.selector import SimpleSelector, RouletteSelector
 from src.domain.stop_condition import StopConditionSimple
 
 N_ITER = 1000
@@ -14,8 +14,8 @@ OBSERVATION_LENGTH = 3
 CROSS_OVER_PROBABILITY = 0.7
 MUTATION_PROBABILITY = 0.2
 
-INITIAL_LEFT = -50
-INITIAL_RIGHT = 50
+INITIAL_LEFT = -10
+INITIAL_RIGHT = 10
 
 INITIAL_POPULATION = np.random.uniform(INITIAL_LEFT, INITIAL_RIGHT, (POPULATION_SIZE, OBSERVATION_LENGTH))
 
