@@ -4,9 +4,6 @@ from dataclasses import dataclass
 
 class Observation(ABC):
 
-    def __init__(self, value):
-        self.value = value
-
     @abstractmethod
     def evaluate(self) -> float:
         pass

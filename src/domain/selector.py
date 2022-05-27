@@ -1,6 +1,4 @@
 from abc import ABC, abstractmethod
-from copy import copy
-
 import numpy as np
 
 from src.domain.population import Population

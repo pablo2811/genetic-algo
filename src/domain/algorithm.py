@@ -3,6 +3,7 @@ from copy import copy
 
 import numpy as np
 
+from visualisation import vis
 from src.domain.population import Population, Observation, PopulationDevelopment
 from src.domain.selector import Selector
 from src.domain.stop_condition import StopCondition
@@ -55,10 +56,14 @@ class GeneticAlgorithm:
         self.cross_over = CrossOver(crossover_probability)
         self.stop_condition = stop_condition
 
-    def run(self, population: Population) -> Observation:
+    def run(self, population: Population, show_solutions=[]) -> Observation:
         population_development = PopulationDevelopment.defaulter()
 
         while not self.stop_condition.stop(population_development):
+            print(population_development.best_score)
+            if population_development.n_iter in show_solutions:
+                best = population.best_observation()
+                vis.show_observation(best, best.r, f"Solution{population_development.n_iter}")
             # perform crossover
             population = self.cross_over.execute(population)
 
