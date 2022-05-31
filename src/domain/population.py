@@ -1,3 +1,4 @@
+import time
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 
@@ -50,6 +51,7 @@ class PopulationDevelopment:
     n_iter: int
     average_score: float
     best_score: float
+    start_time: float
 
     def update(self, population: Population):
         self.n_iter += 1
@@ -58,4 +60,4 @@ class PopulationDevelopment:
 
     @staticmethod
     def defaulter():
-        return PopulationDevelopment(0, float("+inf"), float("+inf"))
+        return PopulationDevelopment(0, float("+inf"), float("+inf"), time.time())

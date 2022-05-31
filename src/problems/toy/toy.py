@@ -5,11 +5,11 @@ import numpy as np
 # params
 from src.domain.algorithm import GeneticAlgorithm
 from src.domain.population import Observation, Population
-from src.domain.selector import SimpleSelector, RouletteSelector
+from src.domain.selector import SimpleSelector, RouletteSelector, TournamentSelector
 from src.domain.stop_condition import StopConditionSimple
 
 N_ITER = 1000
-POPULATION_SIZE = 100
+POPULATION_SIZE = 200
 OBSERVATION_LENGTH = 3
 CROSS_OVER_PROBABILITY = 0.7
 MUTATION_PROBABILITY = 0.2
@@ -23,7 +23,7 @@ INITIAL_POPULATION = np.random.uniform(INITIAL_LEFT, INITIAL_RIGHT, (POPULATION_
 class ParabolaObservation(Observation):
 
     def __init__(self, value: np.array):
-        super().__init__(value)
+        self.value = value
 
     def evaluate(self) -> float:
         return -np.sum(self.value[0] ** 2 + self.value[1] ** 2 + 2 * self.value[2] ** 2)
@@ -38,13 +38,13 @@ class ParabolaObservation(Observation):
 def solve() -> Observation:
     ga = GeneticAlgorithm(
         StopConditionSimple(N_ITER),
-        SimpleSelector(POPULATION_SIZE),
+        TournamentSelector(10, POPULATION_SIZE),
         CROSS_OVER_PROBABILITY,
         MUTATION_PROBABILITY)
 
     population = Population([ParabolaObservation(obs) for obs in INITIAL_POPULATION])
 
-    return ga.run(population)
+    return ga.run(population)[0]
 
 
 def main():

@@ -1,20 +1,11 @@
 import numpy as np
 
-from src.domain.algorithm import GeneticAlgorithm
-from src.domain.population import Observation, Population
-from src.domain.selector import SimpleSelector
-from src.domain.stop_condition import StopConditionSimple
+from src.domain.population import Observation
 from util import get_random_point_in_circle
 
-N_ITER = 200
-POPULATION_SIZE = 50
-CROSS_OVER_PROBABILITY = 0.7
-MUTATION_PROBABILITY = 0.2
-MAX_ATTEMPTS_ONE_OBS = 50
-
 INTERSECTS = 0
-ABOVE = 1
-BELOW = -1
+LEFT = 1
+RIGHT = -1
 
 
 class Rectangle:
@@ -46,13 +37,12 @@ class PlacedRectangle(Rectangle):
 
         return within_circle
 
-    def line_relation(self, a: float, b: float = 0):
-        vals = [a * corner[0] + b for corner in self.all_corners()]
-        if vals[0] > 0 and all([val > 0 for val in vals]):
-            return ABOVE
+    def vertical_slice(self, val: float):
+        if val < self.x:
+            return LEFT
 
-        elif vals[0] < 0 and all([val < 0 for val in vals]):
-            return BELOW
+        if self.x + self.width < val:
+            return RIGHT
 
         return INTERSECTS
 
@@ -85,97 +75,111 @@ class PlacedRectangle(Rectangle):
 
 class CuttingStockObservation(Observation):
 
-    def __init__(self, rectangles: list[PlacedRectangle], available_rectangles: list[Rectangle], r: float):
+    def __init__(self, available_rectangles: list[Rectangle], r: float, attempts_fill: int = 1,
+                 rectangles: list[PlacedRectangle] = []):
         self.r = r
         self.available_rectangles = available_rectangles
         self.rectangles = rectangles
+        self.attempts_fill = attempts_fill
 
     def evaluate(self) -> float:
         return self.evaluate_subset(self.rectangles)
 
-    # TODO: different mutation strategies
     def mutate(self):
-        return self.cut_out_and_replace_mutate_()
+        return self.mutate_singular()
+
+    def mutate_circle(self):
+        center, r_cut = self.micro_circle()
+
+        if np.random.uniform() < 0.75:
+            new_rectangles = self.fill_with_rectangles(center, r_cut)
+        else:
+            new_rectangles = self.cut_out(center, r_cut)
+
+        return CuttingStockObservation(self.available_rectangles, self.r, self.attempts_fill, new_rectangles)
+
+    def mutate_singular(self):
+
+        if np.random.uniform() < 0.75:
+            new_rectangles = self.fill_with_rectangles((0, 0), self.r)
+        else:
+            new_rectangles = self.rectangles.copy()
+            if len(self.rectangles) > 0:
+                ind_delete = np.random.randint(0, len(self.rectangles))
+                new_rectangles.pop(ind_delete)
+
+        return CuttingStockObservation(self.available_rectangles, self.r, self.attempts_fill, new_rectangles)
 
     def crossover(self, other):
         return self.combine_best_halves(other)
 
-    def cut_out_and_replace_mutate_(self):
+    def fill_with_rectangles(self, center: tuple, r: float):
+        return self.rectangles + self.add_rectangles(center, r)
+
+    def micro_circle(self):
         cut_middle = get_random_point_in_circle(self.r)
         r_cut = np.random.uniform(0, self.r - np.linalg.norm(cut_middle))
-        rectangles = list(
-            filter(lambda rect: not rect.within_circle(r_cut, cut_middle[0], cut_middle[1]), self.rectangles)
-        )
-        self.add_rectangles(self.available_rectangles, self.r, rectangles)
+        return cut_middle, r_cut
 
-        return CuttingStockObservation(rectangles, self.available_rectangles, self.r)
+    def cut_out(self, center: tuple, r: float):
+        return list(
+            filter(lambda rect: not rect.within_circle(r, center[0], center[1]), self.rectangles)
+        )
 
     def combine_best_halves(self, other):
 
         best = 0
         best_rectangles = []
 
-        for a in range(10, 1000, 10):
-            for b in (a, -a):
-                self_split = self.split(b)
-                other_split = other.split(b)
-                opt1, opt2 = self_split[ABOVE] + other_split[BELOW], self_split[BELOW] + other_split[ABOVE]
-                if self.evaluate_subset(opt1) > best:
-                    best_rectangles = opt1
-                if self.evaluate_subset(opt2) > best:
-                    best_rectangles = opt2
+        for cut in [-self.r / 2, 0, self.r / 2]:
+            self_split, other_split = self.split(cut), other.split(cut)
+            self_split_eval, other_split_eval = self.evaluate_all(self_split), self.evaluate_all(other_split)
 
-        return CuttingStockObservation(best_rectangles, self.available_rectangles, self.r)
+            a = self_split_eval[LEFT] + other_split_eval[RIGHT]
+            b = self_split_eval[RIGHT] + other_split_eval[LEFT]
+
+            best, best_rectangles = self.update_if_best(best, best_rectangles, a, b, self_split, other_split)
+            best, best_rectangles = self.update_if_best(best, best_rectangles, b, a, other_split, self_split)
+
+        return CuttingStockObservation(self.available_rectangles, self.r,
+                                       (self.attempts_fill + other.attempts_fill) // 2, best_rectangles)
 
     def split(self, a):
 
-        grouped = {ABOVE: [], BELOW: [], INTERSECTS: []}
+        grouped = {LEFT: [], RIGHT: [], INTERSECTS: []}
         for rect in self.rectangles:
-            grouped[rect.line_relation(a)].append(rect)
+            grouped[rect.vertical_slice(a)].append(rect)
 
         return grouped
 
-    @staticmethod
-    def add_rectangles(available_rectangles, r, rectangles, x=0, y=0):
-        for _ in range(MAX_ATTEMPTS_ONE_OBS):
-            for rect in available_rectangles:
+    def add_rectangles(self, center: tuple, r: float):
+        new_rectangles = list()
+
+        x, y = center
+        sorted_rectangles = sorted(self.available_rectangles, key=lambda ar: ar.value / (ar.width * ar.height),
+                                   reverse=True)
+        for _ in range(self.attempts_fill):
+            for rect in sorted_rectangles:
                 point = get_random_point_in_circle(r, x, y)
                 rectangle = PlacedRectangle(point[0], point[1], rect.height, rect.width, rect.value)
-                if rectangle.free_of_overlaps(rectangles) and rectangle.within_circle(r, x, y):
-                    rectangles.append(rectangle)
+                if rectangle.free_of_overlaps(self.rectangles) and rectangle.free_of_overlaps(
+                        new_rectangles) and rectangle.within_circle(r, x, y):
+                    new_rectangles.append(rectangle)
+                    break
+
+        return new_rectangles
 
     @staticmethod
     def evaluate_subset(rectangles):
         return sum(rect.value for rect in rectangles)
 
+    @staticmethod
+    def evaluate_all(dict_of_subsets):
+        return {k: CuttingStockObservation.evaluate_subset(dict_of_subsets[k]) for k in dict_of_subsets}
 
-def initialize_population(available_rectangles: list[Rectangle], r: float):
-    return [initialize_observation(available_rectangles, r) for _ in range(POPULATION_SIZE)]
-
-
-def initialize_observation(available_rectangles: list[Rectangle], r: float) -> CuttingStockObservation:
-    rectangles = list()
-    CuttingStockObservation.add_rectangles(available_rectangles, r, rectangles)
-
-    return CuttingStockObservation(rectangles, available_rectangles, r)
-
-
-def solve() -> Observation:
-    ga = GeneticAlgorithm(
-        StopConditionSimple(N_ITER),
-        SimpleSelector(POPULATION_SIZE),
-        CROSS_OVER_PROBABILITY,
-        MUTATION_PROBABILITY)
-
-    init_pop = Population(initialize_population([Rectangle(1, 1, 1), Rectangle(1, 2, 2)], 20))
-
-    return ga.run(init_pop, list(range(10, 200, 5)))
-
-
-def main():
-    solution = solve()
-    print(f'Value found is: {solution.evaluate()}')
-
-
-if __name__ == '__main__':
-    main()
+    @staticmethod
+    def update_if_best(best, best_rectangles, a, b, self_split, other_split):
+        if a > b and a > best:
+            best = a
+            best_rectangles = self_split[LEFT] + other_split[RIGHT]
+        return best, best_rectangles

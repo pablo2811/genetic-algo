@@ -1,3 +1,4 @@
+import random
 from abc import ABC, abstractmethod
 import numpy as np
 
@@ -43,3 +44,23 @@ class RouletteSelector(Selector):
                     selected.append(population.observations[j])
 
         return Population(selected)
+
+
+class TournamentSelector(Selector):
+
+    def __init__(self, tournament_size: int, population_size: int):
+        self.population_size = population_size
+        self.tournament_size = tournament_size
+
+    def select(self, population: Population) -> Population:
+        selected = list()
+
+        while len(selected) < self.population_size:
+            tournament = random.sample(population.observations, self.tournament_size)
+            sorted(tournament, key=lambda obs: obs.evaluate())
+            selected.append(tournament[-1])
+
+        return Population(selected)
+
+
+

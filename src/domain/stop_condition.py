@@ -1,3 +1,4 @@
+import time
 from abc import abstractmethod, ABC
 
 from src.domain.population import PopulationDevelopment
@@ -31,3 +32,11 @@ class StopConditionSimple(StopCondition):
 
     def stop(self, population_development: PopulationDevelopment) -> bool:
         return population_development.n_iter > self.n_iter
+
+
+class StopConditionTime(StopCondition):
+    def __init__(self, max_time: float):
+        self.max_time = max_time
+
+    def stop(self, population_development: PopulationDevelopment) -> bool:
+        return time.time() - population_development.start_time > self.max_time

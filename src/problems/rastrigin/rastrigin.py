@@ -51,7 +51,7 @@ def solve() -> Observation:
 
     population = Population([RastriginObservation(obs) for obs in INITIAL_POPULATION])
 
-    return ga.run(population)
+    return ga.run(population)[0]
 
 
 def main():
