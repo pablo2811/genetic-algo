@@ -1,0 +1,111 @@
+<html>
+<head>
+<title>testing.ipynb</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #808080;}
+.s1 { color: #cc7832;}
+.s2 { color: #a9b7c6;}
+.s3 { color: #6897bb;}
+.s4 { color: #6a8759;}
+</style>
+</head>
+<body bgcolor="#2b2b2b">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+testing.ipynb</font>
+</center></td></tr></table>
+<pre><span class="s0">#%% 
+</span><span class="s1">from </span><span class="s2">domain.algorithm </span><span class="s1">import </span><span class="s2">GeneticAlgorithm</span>
+<span class="s1">from </span><span class="s2">domain.stop_condition </span><span class="s1">import </span><span class="s2">StopConditionTime</span>
+<span class="s1">from </span><span class="s2">domain.selector </span><span class="s1">import </span><span class="s2">TournamentSelector</span>
+<span class="s1">from </span><span class="s2">cuttingstock </span><span class="s1">import </span><span class="s2">Rectangle</span>
+<span class="s1">from </span><span class="s2">domain.population </span><span class="s1">import </span><span class="s2">Population</span>
+<span class="s1">from </span><span class="s2">cuttingstock </span><span class="s1">import </span><span class="s2">CuttingStockObservation</span>
+<span class="s1">from </span><span class="s2">matplotlib </span><span class="s1">import </span><span class="s2">pyplot </span><span class="s1">as </span><span class="s2">plt</span>
+<span class="s1">from </span><span class="s2">matplotlib </span><span class="s1">import </span><span class="s2">patches</span>
+<span class="s1">from </span><span class="s2">domain.algorithm </span><span class="s1">import </span><span class="s2">GeneticAlgorithmConfiguration</span>
+
+<span class="s1">import </span><span class="s2">math</span>
+<span class="s1">import </span><span class="s2">pandas </span><span class="s1">as </span><span class="s2">pd</span>
+<span class="s0">#%% 
+</span><span class="s2">MAX_TIME = </span><span class="s3">3 </span><span class="s2">* </span><span class="s3">60</span>
+<span class="s2">SHORT_TIME = </span><span class="s3">45</span>
+<span class="s2">NO_IMPROVEMENT_ITER = </span><span class="s3">200</span>
+<span class="s2">POPULATION_SIZE = </span><span class="s3">100</span>
+<span class="s2">CROSS_OVER_PROBABILITY_MAX = </span><span class="s3">0.8</span>
+<span class="s2">CROSS_OVER_PROBABILITY = </span><span class="s3">0.7</span>
+<span class="s2">MUTATION_PROBABILITY = </span><span class="s3">0.15</span>
+<span class="s2">MUTATION_PROBABILITY_MAX = </span><span class="s3">0.35</span>
+<span class="s2">TOURNAMENT_SIZE = </span><span class="s3">10</span>
+<span class="s2">ELITISM_THRESH = </span><span class="s3">10</span>
+<span class="s2">ATTEMPTS = </span><span class="s3">5</span>
+<span class="s0">#%% 
+</span><span class="s1">def </span><span class="s2">tournament_ga():</span>
+    <span class="s1">return </span><span class="s2">GeneticAlgorithm(</span>
+        <span class="s2">StopConditionTime(MAX_TIME)</span><span class="s1">,</span>
+        <span class="s2">TournamentSelector(TOURNAMENT_SIZE</span><span class="s1">, </span><span class="s2">POPULATION_SIZE</span><span class="s1">, </span><span class="s2">ELITISM_THRESH)</span><span class="s1">,</span>
+        <span class="s2">GeneticAlgorithmConfiguration(crossover_proba=CROSS_OVER_PROBABILITY</span><span class="s1">,</span>
+                                      <span class="s2">mutation_proba=MUTATION_PROBABILITY))</span>
+<span class="s0">#%% 
+</span><span class="s1">def </span><span class="s2">fetch_rectangles(path: str):</span>
+    <span class="s2">rects = pd.read_csv(path)</span>
+    <span class="s1">return </span><span class="s2">[Rectangle(row[</span><span class="s3">1</span><span class="s2">]</span><span class="s1">, </span><span class="s2">row[</span><span class="s3">0</span><span class="s2">]</span><span class="s1">, </span><span class="s2">row[</span><span class="s3">2</span><span class="s2">]) </span><span class="s1">for </span><span class="s2">_</span><span class="s1">, </span><span class="s2">row </span><span class="s1">in </span><span class="s2">rects.iterrows()]</span>
+<span class="s0">#%% 
+</span><span class="s1">def </span><span class="s2">initialize_population(available_rectangles: list[Rectangle]</span><span class="s1">, </span><span class="s2">r: float):</span>
+    <span class="s1">return </span><span class="s2">Population(</span>
+        <span class="s2">[CuttingStockObservation(available_rectangles</span><span class="s1">, </span><span class="s2">r) </span><span class="s1">for </span><span class="s2">_ </span><span class="s1">in </span><span class="s2">range(POPULATION_SIZE)])</span>
+<span class="s0">#%% 
+</span><span class="s1">def </span><span class="s2">show_observations(observations</span><span class="s1">, </span><span class="s2">r: float</span><span class="s1">, </span><span class="s2">title: str):</span>
+    <span class="s2">figure</span><span class="s1">, </span><span class="s2">axis = plt.subplots(math.ceil(len(observations) / </span><span class="s3">3</span><span class="s2">)</span><span class="s1">, </span><span class="s3">3</span><span class="s1">, </span><span class="s2">figsize=(</span><span class="s3">20</span><span class="s1">, </span><span class="s3">20</span><span class="s2">)</span><span class="s1">, </span><span class="s2">sharex=</span><span class="s1">True, </span><span class="s2">sharey=</span><span class="s1">True</span><span class="s2">)</span>
+    <span class="s2">plt.grid(linestyle=</span><span class="s4">'--'</span><span class="s2">)</span>
+
+    <span class="s1">for </span><span class="s2">j </span><span class="s1">in </span><span class="s2">range(len(observations)):</span>
+        <span class="s2">ax = axis[j // </span><span class="s3">3</span><span class="s1">, </span><span class="s2">j % </span><span class="s3">3</span><span class="s2">]</span>
+        <span class="s2">ax.set_aspect(</span><span class="s3">1</span><span class="s2">)</span>
+        <span class="s2">ax.add_artist(plt.Circle((</span><span class="s3">0</span><span class="s1">, </span><span class="s3">0</span><span class="s2">)</span><span class="s1">, </span><span class="s2">r</span><span class="s1">, </span><span class="s2">color=</span><span class="s4">'r'</span><span class="s1">, </span><span class="s2">fill=</span><span class="s1">False</span><span class="s2">))</span>
+        <span class="s2">ax.set_xlim(-r * </span><span class="s3">1.25</span><span class="s1">, </span><span class="s2">r * </span><span class="s3">1.25</span><span class="s2">)</span>
+        <span class="s2">ax.set_ylim(-r * </span><span class="s3">1.25</span><span class="s1">, </span><span class="s2">r * </span><span class="s3">1.25</span><span class="s2">)</span>
+
+        <span class="s1">for </span><span class="s2">rect </span><span class="s1">in </span><span class="s2">observations[j].rectangles:</span>
+            <span class="s2">rect_img = patches.Rectangle((rect.x</span><span class="s1">, </span><span class="s2">rect.y - rect.height)</span><span class="s1">, </span><span class="s2">rect.width</span><span class="s1">, </span><span class="s2">rect.height</span><span class="s1">, </span><span class="s2">edgecolor=</span><span class="s4">&quot;b&quot;</span><span class="s2">)</span>
+            <span class="s2">ax.add_patch(rect_img)</span>
+
+        <span class="s2">ax.title.set_text(</span><span class="s4">f'score = </span><span class="s1">{</span><span class="s2">observations[j].evaluate()</span><span class="s1">}</span><span class="s4">'</span><span class="s2">)</span>
+
+    <span class="s2">plt.suptitle(title</span><span class="s1">, </span><span class="s2">fontsize=</span><span class="s3">20</span><span class="s2">)</span>
+    <span class="s2">plt.show()</span>
+<span class="s0">#%% 
+</span><span class="s1">def </span><span class="s2">solve(r):</span>
+    <span class="s2">print(</span><span class="s4">f&quot;Starting solving r</span><span class="s1">{</span><span class="s2">r</span><span class="s1">} </span><span class="s4">...&quot;</span><span class="s2">)</span>
+
+    <span class="s2">path = </span><span class="s4">f'data/r</span><span class="s1">{</span><span class="s2">r</span><span class="s1">}</span><span class="s4">.csv'</span>
+    <span class="s2">ga = tournament_ga()</span>
+    <span class="s2">population = initialize_population(fetch_rectangles(path)</span><span class="s1">, </span><span class="s2">r)</span>
+
+    <span class="s1">return </span><span class="s2">ga.run(population)</span>
+<span class="s0">#%% 
+</span><span class="s2">solution_800 = solve(</span><span class="s3">800</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span><span class="s2">show_observations(solution_800[::</span><span class="s3">2</span><span class="s2">]</span><span class="s1">, </span><span class="s3">800</span><span class="s1">, </span><span class="s4">&quot;R = 800&quot;</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span><span class="s2">solution_1000 = solve(</span><span class="s3">1000</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span><span class="s2">show_observations(solution_1000[::</span><span class="s3">3</span><span class="s2">][:-</span><span class="s3">3</span><span class="s2">]</span><span class="s1">, </span><span class="s3">1000</span><span class="s1">, </span><span class="s4">&quot;R = 1000&quot;</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span><span class="s2">solution_1100 = solve(</span><span class="s3">1100</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span><span class="s2">show_observations(solution_1100[::</span><span class="s3">3</span><span class="s2">][:-</span><span class="s3">4</span><span class="s2">] + [solution_1100[-</span><span class="s3">1</span><span class="s2">]]</span><span class="s1">, </span><span class="s3">1100</span><span class="s1">, </span><span class="s4">&quot;R = 1100&quot;</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span><span class="s2">solution_1200 = solve(</span><span class="s3">1200</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span><span class="s2">show_observations(solution_1200[::</span><span class="s3">2</span><span class="s2">][:-</span><span class="s3">2</span><span class="s2">] + [solution_1200[-</span><span class="s3">1</span><span class="s2">]]</span><span class="s1">, </span><span class="s3">1200</span><span class="s1">, </span><span class="s4">&quot;R = 1200&quot;</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span><span class="s2">solution_850 = solve(</span><span class="s3">850</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span><span class="s2">show_observations(solution_850[: -</span><span class="s3">4</span><span class="s2">] + [solution_850[-</span><span class="s3">1</span><span class="s2">]]</span><span class="s1">, </span><span class="s3">850</span><span class="s1">, </span><span class="s4">&quot;R = 850&quot;</span><span class="s2">)</span>
+<span class="s0">#%% 
+</span></pre>
+</body>
+</html>
