@@ -40,3 +40,20 @@ class StopConditionTime(StopCondition):
 
     def stop(self, population_development: PopulationDevelopment) -> bool:
         return time.time() - population_development.start_time > self.max_time
+
+
+def no_improvement(scores):
+    for i in range(1, len(scores)):
+        if scores[i - 1] < scores[i]:
+            return False
+    return True
+
+
+class StopConditionEarlyStopping(StopCondition):
+
+    def __init__(self, n_iter: int):
+        self.n_iter = n_iter
+
+    def stop(self, population_development: PopulationDevelopment) -> bool:
+        return population_development.n_iter > self.n_iter and no_improvement(
+            population_development.best_score[-self.n_iter:])

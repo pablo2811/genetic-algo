@@ -50,14 +50,16 @@ class Population:
 class PopulationDevelopment:
     n_iter: int
     average_score: float
-    best_score: float
+    best_score: list[float]
     start_time: float
+    improved_mutations: list[bool]
 
-    def update(self, population: Population):
+    def update(self, population: Population, mutation_improvement_ratio):
         self.n_iter += 1
         self.average_score = population.average_score()
-        self.best_score = population.best_score()
+        self.best_score.append(population.best_score())
+        self.improved_mutations.append(mutation_improvement_ratio > 0.2)
 
     @staticmethod
     def defaulter():
-        return PopulationDevelopment(0, float("+inf"), float("+inf"), time.time())
+        return PopulationDevelopment(0, float("+inf"), [], time.time(), [])

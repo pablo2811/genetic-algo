@@ -48,12 +48,13 @@ class RouletteSelector(Selector):
 
 class TournamentSelector(Selector):
 
-    def __init__(self, tournament_size: int, population_size: int):
+    def __init__(self, tournament_size: int, population_size: int, elitism_thresh: int = 0):
+        self.elitism_thresh = elitism_thresh
         self.population_size = population_size
         self.tournament_size = tournament_size
 
     def select(self, population: Population) -> Population:
-        selected = list()
+        selected = population.n_best_observations(self.elitism_thresh)
 
         while len(selected) < self.population_size:
             tournament = random.sample(population.observations, self.tournament_size)

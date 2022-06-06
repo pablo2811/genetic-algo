@@ -9,3 +9,7 @@ def get_random_point_in_circle(r: float, x: float = 0, y: float = 0):
     else:
         a = u
     return x + r * a * np.cos(t), y + r * a * np.sin(t)
+
+
+def get_random_number(lower: float, upper: float):
+    return np.random.uniform(lower, upper)

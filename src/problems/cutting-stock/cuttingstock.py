@@ -75,46 +75,72 @@ class PlacedRectangle(Rectangle):
 
 class CuttingStockObservation(Observation):
 
-    def __init__(self, available_rectangles: list[Rectangle], r: float, attempts_fill: int = 1,
+    def __init__(self, available_rectangles: list[Rectangle], r: float,
                  rectangles: list[PlacedRectangle] = []):
         self.r = r
-        self.available_rectangles = available_rectangles
+        self.available_rectangles = sorted(available_rectangles,
+                                           key=lambda ar: ar.value / (ar.width * ar.height),
+                                           reverse=True)
         self.rectangles = rectangles
-        self.attempts_fill = attempts_fill
 
     def evaluate(self) -> float:
         return self.evaluate_subset(self.rectangles)
 
     def mutate(self):
-        return self.mutate_singular()
-
-    def mutate_circle(self):
-        center, r_cut = self.micro_circle()
-
-        if np.random.uniform() < 0.75:
-            new_rectangles = self.fill_with_rectangles(center, r_cut)
-        else:
-            new_rectangles = self.cut_out(center, r_cut)
-
-        return CuttingStockObservation(self.available_rectangles, self.r, self.attempts_fill, new_rectangles)
-
-    def mutate_singular(self):
-
-        if np.random.uniform() < 0.75:
-            new_rectangles = self.fill_with_rectangles((0, 0), self.r)
-        else:
-            new_rectangles = self.rectangles.copy()
-            if len(self.rectangles) > 0:
-                ind_delete = np.random.randint(0, len(self.rectangles))
-                new_rectangles.pop(ind_delete)
-
-        return CuttingStockObservation(self.available_rectangles, self.r, self.attempts_fill, new_rectangles)
+        return self.tetris_fall_or_delete()
 
     def crossover(self, other):
-        return self.combine_best_halves(other)
+        return self.combine_simple_halves(other)
 
-    def fill_with_rectangles(self, center: tuple, r: float):
-        return self.rectangles + self.add_rectangles(center, r)
+    # combined mutation
+    def tetris_fall_or_delete(self):
+
+        if np.random.uniform() < 0.5:
+            # adds rectangles
+            return self.mutate_tetris()
+        else:
+            # deletes rectangles
+            center, r_cut = self.micro_circle()
+
+            return CuttingStockObservation(self.available_rectangles, self.r, self.cut_out(center, r_cut))
+
+    def mutate_tetris(self):
+
+        new_rectangles = self.rectangles + self.add_rectangles_tetris()
+
+        return CuttingStockObservation(self.available_rectangles, self.r, new_rectangles)
+
+    # cross-over - simple combination of two halves
+    def combine_simple_halves(self, other):
+        self_split, other_split = self.split(0), other.split(0)
+
+        return CuttingStockObservation(self.available_rectangles, self.r, self_split[LEFT] + other_split[RIGHT])
+
+    # cross-over - selecting best split
+    def combine_best_halves(self, other):
+
+        best = 0
+        best_rectangles = []
+
+        for cut in [-self.r / 4, -self.r / 2, 0, self.r / 2, self.r / 4]:
+            self_split, other_split = self.split(cut), other.split(cut)
+            self_split_eval, other_split_eval = self.evaluate_all(self_split), self.evaluate_all(other_split)
+
+            a = self_split_eval[LEFT] + other_split_eval[RIGHT]
+            b = self_split_eval[RIGHT] + other_split_eval[LEFT]
+
+            best, best_rectangles = self.update_if_best(best, best_rectangles, a, b, self_split, other_split)
+            best, best_rectangles = self.update_if_best(best, best_rectangles, b, a, other_split, self_split)
+
+        return CuttingStockObservation(self.available_rectangles, self.r, best_rectangles)
+
+    def split(self, a):
+
+        grouped = {LEFT: [], RIGHT: [], INTERSECTS: []}
+        for rect in self.rectangles:
+            grouped[rect.vertical_slice(a)].append(rect)
+
+        return grouped
 
     def micro_circle(self):
         cut_middle = get_random_point_in_circle(self.r)
@@ -126,48 +152,34 @@ class CuttingStockObservation(Observation):
             filter(lambda rect: not rect.within_circle(r, center[0], center[1]), self.rectangles)
         )
 
-    def combine_best_halves(self, other):
-
-        best = 0
-        best_rectangles = []
-
-        for cut in [-self.r / 2, 0, self.r / 2]:
-            self_split, other_split = self.split(cut), other.split(cut)
-            self_split_eval, other_split_eval = self.evaluate_all(self_split), self.evaluate_all(other_split)
-
-            a = self_split_eval[LEFT] + other_split_eval[RIGHT]
-            b = self_split_eval[RIGHT] + other_split_eval[LEFT]
-
-            best, best_rectangles = self.update_if_best(best, best_rectangles, a, b, self_split, other_split)
-            best, best_rectangles = self.update_if_best(best, best_rectangles, b, a, other_split, self_split)
-
-        return CuttingStockObservation(self.available_rectangles, self.r,
-                                       (self.attempts_fill + other.attempts_fill) // 2, best_rectangles)
-
-    def split(self, a):
-
-        grouped = {LEFT: [], RIGHT: [], INTERSECTS: []}
-        for rect in self.rectangles:
-            grouped[rect.vertical_slice(a)].append(rect)
-
-        return grouped
-
-    def add_rectangles(self, center: tuple, r: float):
+    def add_rectangles_tetris(self):
         new_rectangles = list()
 
-        x, y = center
-        sorted_rectangles = sorted(self.available_rectangles, key=lambda ar: ar.value / (ar.width * ar.height),
-                                   reverse=True)
-        for _ in range(self.attempts_fill):
-            for rect in sorted_rectangles:
-                point = get_random_point_in_circle(r, x, y)
-                rectangle = PlacedRectangle(point[0], point[1], rect.height, rect.width, rect.value)
-                if rectangle.free_of_overlaps(self.rectangles) and rectangle.free_of_overlaps(
-                        new_rectangles) and rectangle.within_circle(r, x, y):
-                    new_rectangles.append(rectangle)
-                    break
+        for rect in self.available_rectangles:
+            x = np.random.uniform(-self.r, self.r - rect.width)
+            new_rect = self.fall_along_axis(x, rect, new_rectangles)
+
+            if new_rect is not None:
+                new_rectangles.append(new_rect)
+                break
 
         return new_rectangles
+
+    def fall_along_axis(self, x, rect, already_created):
+        current_y = min(np.sqrt(self.r ** 2 - x ** 2), np.sqrt(self.r ** 2 - (x + rect.width) ** 2))
+        rectangle = PlacedRectangle(x, current_y, rect.height, rect.width, rect.value)
+        delta = rect.height / 4
+
+        last_free_of_overlaps = None
+        while rectangle.within_circle(self.r, 0, 0):
+
+            if rectangle.free_of_overlaps(self.rectangles) and rectangle.free_of_overlaps(already_created):
+                last_free_of_overlaps = rectangle
+
+            current_y -= delta
+            rectangle = PlacedRectangle(x, current_y, rect.height, rect.width, rect.value)
+
+        return last_free_of_overlaps
 
     @staticmethod
     def evaluate_subset(rectangles):
